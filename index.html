@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#8B1A1A">
+<title id="page-title">線上求籤</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary:    #8B1A1A;
+  --secondary:  #C8960C;
+  --accent:     #F5DEB3;
+  --bg:         #1a0a00;
+  --card-bg:    #2a1200;
+  --text:       #F5E6C8;
+  --text-muted: #B8956A;
+  --radius-sm:  8px;
+  --radius-md:  14px;
+  --radius-lg:  20px;
+}
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Noto Serif TC", "Noto Serif", Georgia, "Times New Roman", serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Background ───────────────────────────────────────── */
+.bg-layer {
+  position: fixed; inset: 0; z-index: 0;
+  background: var(--bg);
+}
+.bg-layer::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(139,26,26,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(200,150,12,0.12) 0%, transparent 60%);
+}
+.bg-pattern {
+  position: absolute; inset: 0; opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M30 2L58 30 30 58 2 30z' fill='none' stroke='%23C8960C' stroke-width='1'/%3E%3Ccircle cx='30' cy='30' r='8' fill='none' stroke='%23C8960C' stroke-width='0.5'/%3E%3C/svg%3E");
+}
+.bg-image {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  opacity: 0.15;
+}
+
+/* ── App Shell ────────────────────────────────────────── */
+#app {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  max-width: 480px; margin: 0 auto;
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+
+/* ── Screens ──────────────────────────────────────────── */
+.screen {
+  display: none; flex-direction: column;
+  flex: 1; padding: 24px 20px 32px;
+  animation: fadeIn 0.4s ease;
+}
+.screen.active { display: flex; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ── Header ───────────────────────────────────────────── */
+.temple-header {
+  text-align: center; padding: 40px 20px 28px;
+}
+.temple-logo {
+  width: 80px; height: 80px; margin: 0 auto 16px;
+  border-radius: 50%;
+  border: 2px solid var(--secondary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; background: rgba(139,26,26,0.3);
+  box-shadow: 0 0 24px rgba(200,150,12,0.25);
+}
+.temple-logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.temple-name {
+  font-size: 26px; font-weight: 700;
+  color: var(--secondary);
+  text-shadow: 0 0 20px rgba(200,150,12,0.4);
+  letter-spacing: 0.06em;
+}
+.temple-subtitle {
+  font-size: 13px; color: var(--text-muted);
+  margin-top: 6px; letter-spacing: 0.08em;
+}
+
+/* ── Divider ──────────────────────────────────────────── */
+.gold-divider {
+  height: 1px; margin: 0 20px;
+  background: linear-gradient(to right, transparent, var(--secondary), transparent);
+  opacity: 0.4;
+}
+.ornament {
+  text-align: center; color: var(--secondary);
+  font-size: 18px; margin: -9px 0; z-index: 1;
+  position: relative;
+}
+
+/* ── Deity Section ────────────────────────────────────── */
+.deity-section {
+  text-align: center; padding: 28px 0 24px;
+}
+.deity-text {
+  font-size: 13px; color: var(--text-muted); letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.deity-name {
+  font-size: 20px; color: var(--accent);
+  letter-spacing: 0.15em;
+}
+.incense-icon {
+  font-size: 32px; display: block; margin-bottom: 12px;
+  animation: flicker 3s ease-in-out infinite;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(0.97); }
+}
+
+/* ── Lot Container ────────────────────────────────────── */
+.lot-container {
+  position: relative;
+  width: 140px; height: 220px;
+  margin: 0 auto 32px;
+  cursor: pointer;
+}
+.lot-tube {
+  width: 100%; height: 100%;
+  background: linear-gradient(160deg, #5a2000 0%, #3a1500 40%, #2a0e00 100%);
+  border-radius: 12px 12px 6px 6px;
+  border: 1px solid rgba(200,150,12,0.3);
+  position: relative; overflow: hidden;
+  box-shadow:
+    inset 2px 0 8px rgba(0,0,0,0.5),
+    inset -2px 0 8px rgba(0,0,0,0.5),
+    0 8px 32px rgba(0,0,0,0.6),
+    0 0 0 1px rgba(200,150,12,0.15);
+}
+.lot-tube::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 60%;
+  background: linear-gradient(180deg, rgba(200,150,12,0.08) 0%, transparent 100%);
+}
+.lot-tube-label {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+}
+.lot-tube-label .kanji {
+  font-size: 48px; color: rgba(200,150,12,0.7);
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(200,150,12,0.5);
+}
+.lot-tube-label .hint {
+  font-size: 12px; color: rgba(245,222,179,0.5);
+  letter-spacing: 0.1em;
+}
+.lot-sticks {
+  position: absolute; bottom: -8px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 3px;
+}
+.stick {
+  width: 8px; height: 80px;
+  background: linear-gradient(180deg, #D4A84B 0%, #8B6914 50%, #5C4510 100%);
+  border-radius: 4px 4px 2px 2px;
+  transform-origin: bottom center;
+  box-shadow: 1px 0 3px rgba(0,0,0,0.4);
+}
+.stick:nth-child(2) { transform: rotate(-5deg); }
+.stick:nth-child(3) { transform: rotate(5deg); }
+.stick:nth-child(4) { transform: rotate(-3deg); }
+.stick:nth-child(5) { transform: rotate(8deg); }
+.stick:nth-child(6) { transform: rotate(-8deg); }
+.stick:nth-child(7) { transform: rotate(3deg); }
+
+/* Shake animation */
+@keyframes shake {
+  0%   { transform: translateX(-50%) rotate(0deg); }
+  10%  { transform: translateX(-50%) rotate(-8deg) translateY(-4px); }
+  20%  { transform: translateX(-50%) rotate(8deg) translateY(-8px); }
+  30%  { transform: translateX(-50%) rotate(-6deg) translateY(-4px); }
+  40%  { transform: translateX(-50%) rotate(6deg) translateY(-8px); }
+  50%  { transform: translateX(-50%) rotate(-4deg) translateY(-4px); }
+  60%  { transform: translateX(-50%) rotate(4deg) translateY(-2px); }
+  70%  { transform: translateX(-50%) rotate(-2deg) translateY(-6px); }
+  80%  { transform: translateX(-50%) rotate(2deg) translateY(-2px); }
+  90%  { transform: translateX(-50%) rotate(-1deg) translateY(-4px); }
+  100% { transform: translateX(-50%) rotate(0deg); }
+}
+.lot-sticks.shaking { animation: shake 1.6s ease-in-out; }
+
+/* Stick fly out */
+@keyframes stickFly {
+  0%   { opacity: 1; transform: rotate(var(--r)) translateY(0); }
+  30%  { opacity: 1; transform: rotate(var(--r)) translateY(-60px); }
+  100% { opacity: 0; transform: rotate(var(--r)) translateY(-30px) translateX(var(--x)); }
+}
+
+/* ── Shake Button ─────────────────────────────────────── */
+.btn-shake {
+  display: block; width: 100%;
+  padding: 18px 0;
+  background: linear-gradient(135deg, var(--primary) 0%, #6B1212 100%);
+  border: 1px solid rgba(200,150,12,0.4);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-size: 18px; font-family: inherit;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(139,26,26,0.5), 0 0 0 1px rgba(200,150,12,0.1);
+  transition: all 0.2s;
+}
+.btn-shake::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(200,150,12,0.15), transparent);
+}
+.btn-shake:active { transform: scale(0.97); }
+.btn-shake:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Instructions ─────────────────────────────────────── */
+.instructions {
+  text-align: center; padding: 0 0 8px;
+}
+.instructions p {
+  font-size: 13px; color: var(--text-muted);
+  line-height: 1.7; letter-spacing: 0.04em;
+}
+
+/* ── Loading Screen ───────────────────────────────────── */
+.loading-center {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 24px;
+}
+.spinner {
+  width: 56px; height: 56px;
+  border: 2px solid rgba(200,150,12,0.2);
+  border-top-color: var(--secondary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  font-size: 15px; color: var(--text-muted);
+  letter-spacing: 0.1em; text-align: center;
+}
+.loading-steps { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.loading-steps li {
+  font-size: 13px; color: rgba(184,149,106,0.5);
+  display: flex; align-items: center; gap: 8px;
+  transition: color 0.5s;
+}
+.loading-steps li.done { color: var(--secondary); }
+.loading-steps li::before {
+  content: '○'; font-size: 10px; color: inherit;
+}
+.loading-steps li.done::before { content: '◉'; }
+
+/* ── Result Screen ────────────────────────────────────── */
+.lot-badge {
+  text-align: center; padding: 32px 0 20px;
+}
+.lot-number-label {
+  font-size: 12px; color: var(--text-muted);
+  letter-spacing: 0.15em; margin-bottom: 4px;
+}
+.lot-number {
+  font-size: 60px; font-weight: 700;
+  color: var(--secondary);
+  text-shadow: 0 0 30px rgba(200,150,12,0.5);
+  line-height: 1;
+}
+.level-badge {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 6px 22px;
+  border-radius: 999px;
+  font-size: 15px; letter-spacing: 0.15em;
+  border: 1px solid currentColor;
+}
+.level-大吉 { color: #FFD700; border-color: rgba(255,215,0,0.5); background: rgba(255,215,0,0.1); }
+.level-中吉 { color: #FFA040; border-color: rgba(255,160,64,0.5); background: rgba(255,160,64,0.1); }
+.level-小吉 { color: #90EE90; border-color: rgba(144,238,144,0.5); background: rgba(144,238,144,0.1); }
+.level-平   { color: #B8956A; border-color: rgba(184,149,106,0.5); background: rgba(184,149,106,0.1); }
+.level-小凶 { color: #DDA0DD; border-color: rgba(221,160,221,0.5); background: rgba(221,160,221,0.1); }
+.level-中凶 { color: #F08080; border-color: rgba(240,128,128,0.5); background: rgba(240,128,128,0.1); }
+.level-大凶 { color: #FF6B6B; border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.1); }
+
+/* ── Poem Card ────────────────────────────────────────── */
+.card {
+  background: var(--card-bg);
+  border: 1px solid rgba(200,150,12,0.2);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 12px;
+  position: relative; overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(to right, transparent, var(--secondary), transparent);
+  opacity: 0.6;
+}
+.card-label {
+  font-size: 11px; color: var(--secondary);
+  letter-spacing: 0.15em; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-label::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(to right, rgba(200,150,12,0.3), transparent);
+}
+
+.poem-text {
+  font-size: 17px; line-height: 2;
+  color: var(--accent);
+  text-align: center;
+  letter-spacing: 0.05em;
+  white-space: pre-line;
+}
+
+.meaning-text {
+  font-size: 14px; line-height: 1.85;
+  color: var(--text); letter-spacing: 0.02em;
+}
+.advice-text {
+  font-size: 13px; line-height: 1.75;
+  color: var(--text-muted); letter-spacing: 0.02em;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(200,150,12,0.1);
+}
+
+/* ── Fortune Grid ─────────────────────────────────────── */
+.fortune-tabs {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 6px; margin-bottom: 8px;
+}
+.fortune-tab {
+  padding: 8px 4px;
+  background: rgba(200,150,12,0.06);
+  border: 1px solid rgba(200,150,12,0.15);
+  border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--text-muted);
+  text-align: center; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+  letter-spacing: 0.04em;
+}
+.fortune-tab.active {
+  background: rgba(200,150,12,0.2);
+  border-color: rgba(200,150,12,0.5);
+  color: var(--secondary);
+}
+.fortune-content {
+  min-height: 56px;
+  font-size: 14px; line-height: 1.75;
+  color: var(--text);
+  padding: 4px 0;
+}
+
+/* ── Action Buttons ───────────────────────────────────── */
+.action-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; margin-top: 8px;
+}
+.btn-secondary {
+  padding: 14px;
+  background: transparent;
+  border: 1px solid rgba(200,150,12,0.35);
+  border-radius: var(--radius-md);
+  color: var(--secondary);
+  font-size: 15px; font-family: inherit;
+  letter-spacing: 0.08em;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-secondary:active { background: rgba(200,150,12,0.1); transform: scale(0.97); }
+.btn-primary-sm {
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary), #6B1212);
+  border: 1px solid rgba(200,150,12,0.3);
+  border-radius: var(--radius-md);
+  color: var(--accent);
+  font-size: 15px; font-family: inherit;
+  letter-spacing: 0.08em;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-primary-sm:active { transform: scale(0.97); }
+
+/* ── Footer ───────────────────────────────────────────── */
+.app-footer {
+  text-align: center;
+  padding: 16px 20px 20px;
+  font-size: 11px; color: rgba(184,149,106,0.4);
+  letter-spacing: 0.06em;
+  position: relative; z-index: 1;
+}
+
+/* ── Toast ────────────────────────────────────────────── */
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: rgba(42,18,0,0.95);
+  border: 1px solid rgba(200,150,12,0.4);
+  border-radius: var(--radius-sm);
+  padding: 12px 20px;
+  font-size: 13px; color: var(--accent);
+  letter-spacing: 0.06em;
+  z-index: 999; white-space: nowrap;
+  animation: toastIn 0.3s ease;
+  pointer-events: none;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+
+/* ── Scroll ───────────────────────────────────────────── */
+.scroll-area {
+  flex: 1; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+.scroll-area::-webkit-scrollbar { width: 0; }
+
+/* ── Divider line ─────────────────────────────────────── */
+.section-gap { height: 12px; }
+</style>
+</head>
+<body>
+
+<!-- Background layers -->
+<div class="bg-layer">
+  <div class="bg-pattern"></div>
+  <div class="bg-image" id="bg-image"></div>
+</div>
+
+<!-- App -->
+<div id="app">
+
+  <!-- ══ Screen: Home ════════════════════════════════════ -->
+  <div class="screen active" id="screen-home">
+
+    <div class="temple-header">
+      <div class="temple-logo" id="logo-wrap">
+        <span id="logo-icon">🏯</span>
+      </div>
+      <div class="temple-name" id="temple-name">礁溪三皇宮</div>
+      <div class="temple-subtitle" id="temple-subtitle">線上求籤解籤服務</div>
+    </div>
+
+    <div class="gold-divider"></div>
+    <div class="ornament">❈</div>
+    <div class="gold-divider"></div>
+
+    <div class="deity-section">
+      <span class="incense-icon">🕯️</span>
+      <div class="deity-text">恭請</div>
+      <div class="deity-name" id="deity-name">三皇大帝</div>
+      <div class="deity-text" style="margin-top:6px">賜籤指引</div>
+    </div>
+
+    <!-- Lot tube -->
+    <div class="lot-container" onclick="onShake()">
+      <div class="lot-tube">
+        <div class="lot-tube-label">
+          <span class="kanji">籤</span>
+          <span class="hint">點擊搖籤</span>
+        </div>
+      </div>
+      <div class="lot-sticks" id="lot-sticks">
+        <div class="stick"></div>
+        <div class="stick"></div>
+        <div class="stick"></div>
+        <div class="stick"></div>
+        <div class="stick"></div>
+        <div class="stick"></div>
+        <div class="stick"></div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <p>心中默念所求之事<br>點擊搖籤筒，待籤詩自然落出</p>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <button class="btn-shake" id="btn-shake" onclick="onShake()">
+      ✦ 開始求籤 ✦
+    </button>
+
+    <div class="section-gap"></div>
+
+    <div class="gold-divider"></div>
+  </div>
+
+  <!-- ══ Screen: Loading ═════════════════════════════════ -->
+  <div class="screen" id="screen-loading">
+    <div class="loading-center">
+      <div class="spinner"></div>
+      <div class="loading-text">神明賜籤中…</div>
+      <ul class="loading-steps" id="loading-steps">
+        <li>誠心祈請</li>
+        <li>搖動籤筒</li>
+        <li>籤詩落出</li>
+        <li>解析天意</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ Screen: Result ══════════════════════════════════ -->
+  <div class="screen" id="screen-result">
+    <div class="scroll-area">
+
+      <!-- Lot number + level -->
+      <div class="lot-badge">
+        <div class="lot-number-label">第</div>
+        <div class="lot-number" id="res-number">—</div>
+        <div class="lot-number-label">籤</div>
+        <div>
+          <span class="level-badge" id="res-level">大吉</span>
+        </div>
+      </div>
+
+      <div class="gold-divider"></div>
+      <div class="ornament">❈</div>
+      <div class="gold-divider"></div>
+      <div class="section-gap"></div>
+
+      <!-- Poem -->
+      <div class="card">
+        <div class="card-label">籤詩原文</div>
+        <div class="poem-text" id="res-poem"></div>
+      </div>
+
+      <!-- Meaning -->
+      <div class="card">
+        <div class="card-label">籤詩解義</div>
+        <div class="meaning-text" id="res-meaning"></div>
+        <div class="advice-text" id="res-advice"></div>
+      </div>
+
+      <!-- Fortune by category -->
+      <div class="card">
+        <div class="card-label">各方運勢</div>
+        <div class="fortune-tabs">
+          <button class="fortune-tab active" onclick="showFortune('overall', this)">總運</button>
+          <button class="fortune-tab" onclick="showFortune('love', this)">感情</button>
+          <button class="fortune-tab" onclick="showFortune('career', this)">事業</button>
+          <button class="fortune-tab" onclick="showFortune('health', this)">健康</button>
+          <button class="fortune-tab" onclick="showFortune('wealth', this)">財運</button>
+        </div>
+        <div class="fortune-content" id="fortune-content"></div>
+      </div>
+
+      <div class="section-gap"></div>
+
+      <!-- Actions -->
+      <div class="action-row">
+        <button class="btn-secondary" onclick="onShare()">分享籤詩</button>
+        <button class="btn-primary-sm" onclick="onReset()">重新求籤</button>
+      </div>
+
+      <div class="section-gap"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="app-footer" id="footer-text">
+    ✦ 求籤僅供參考，凡事盡人事聽天命 ✦
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="config.js"></script>
+<script>
+// ── Apply config ──────────────────────────────────────────
+(function applyConfig() {
+  const C = TEMPLE_CONFIG;
+  const T = C.theme;
+
+  // CSS vars
+  const root = document.documentElement;
+  root.style.setProperty('--primary',     T.primary);
+  root.style.setProperty('--secondary',   T.secondary);
+  root.style.setProperty('--accent',      T.accent);
+  root.style.setProperty('--bg',          T.bg);
+  root.style.setProperty('--card-bg',     T.cardBg);
+  root.style.setProperty('--text',        T.text);
+  root.style.setProperty('--text-muted',  T.textMuted);
+
+  // Meta
+  document.getElementById('page-title').textContent   = C.name + ' 線上求籤';
+  document.getElementById('temple-name').textContent  = C.name;
+  document.getElementById('temple-subtitle').textContent = C.subtitle;
+  document.getElementById('deity-name').textContent   = C.deity;
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', T.primary);
+
+  // Logo
+  if (C.logoUrl) {
+    document.getElementById('logo-icon').innerHTML =
+      `<img src="${C.logoUrl}" alt="${C.name}">`;
+  }
+
+  // BG image
+  if (C.bgImageUrl) {
+    document.getElementById('bg-image').style.backgroundImage = `url('${C.bgImageUrl}')`;
+  }
+
+  // Footer
+  if (C.founded) {
+    document.getElementById('footer-text').textContent =
+      `${C.name} 創建於 ${C.founded} ✦ 求籤僅供參考`;
+  }
+})();
+
+// ── State ─────────────────────────────────────────────────
+let currentLot = null;
+let currentFortune = {};
+let isAnimating = false;
+
+// ── Screen navigation ─────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+// ── Pick a random lot ──────────────────────────────────────
+function pickLot() {
+  const lots = TEMPLE_CONFIG.lots;
+  const totalLots = TEMPLE_CONFIG.totalLots;
+
+  // Pick random lot number 1 ~ totalLots
+  const num = Math.floor(Math.random() * totalLots) + 1;
+
+  // Find in database or generate generic
+  const found = lots.find(l => l.id === num);
+  if (found) return { ...found };
+
+  // Fallback: generic lot based on number range
+  const levels = ['大吉','中吉','小吉','平','小吉','中吉','平','小凶','平','中吉'];
+  const level = levels[num % levels.length];
+  return {
+    id: num,
+    level: level,
+    poem: "天意難測心自知，\n誠心祈求福自來。\n凡事盡力莫強求，\n隨緣自在是真諦。",
+    meaning: "此籤示意諸事隨緣，心誠則靈。凡事盡力而為，不強求結果，自然心想事成。",
+    advice: "保持平靜心態，誠心面對每一件事。上天自有安排，信任天意，順勢而為。",
+    fortune: {
+      overall: "隨緣自在，心誠則靈",
+      love:    "感情順其自然，真心相待必有善果",
+      career:  "盡力即可，勿過於執著於結果",
+      health:  "保持心情愉快，健康自然相隨",
+      wealth:  "財運平穩，量力而行"
+    }
+  };
+}
+
+// ── Shake animation ────────────────────────────────────────
+function onShake() {
+  if (isAnimating) return;
+  isAnimating = true;
+
+  const btn = document.getElementById('btn-shake');
+  btn.disabled = true;
+  btn.textContent = '搖籤中…';
+
+  const sticks = document.getElementById('lot-sticks');
+  sticks.classList.add('shaking');
+
+  setTimeout(() => {
+    sticks.classList.remove('shaking');
+    startLoading();
+  }, 1700);
+}
+
+// ── Loading sequence ───────────────────────────────────────
+function startLoading() {
+  showScreen('loading');
+  const steps = document.querySelectorAll('#loading-steps li');
+  let i = 0;
+  const interval = setInterval(() => {
+    if (i < steps.length) {
+      steps[i].classList.add('done');
+      i++;
+    } else {
+      clearInterval(interval);
+      setTimeout(showResult, 400);
+    }
+  }, 500);
+}
+
+// ── Show result ────────────────────────────────────────────
+function showResult() {
+  currentLot = pickLot();
+  currentFortune = currentLot.fortune;
+
+  // Fill in data
+  document.getElementById('res-number').textContent = String(currentLot.id).padStart(2, '0');
+
+  const levelEl = document.getElementById('res-level');
+  levelEl.textContent = currentLot.level;
+  levelEl.className = 'level-badge level-' + currentLot.level;
+
+  document.getElementById('res-poem').textContent = currentLot.poem;
+  document.getElementById('res-meaning').textContent = currentLot.meaning;
+  document.getElementById('res-advice').textContent = '✦ 神示：' + currentLot.advice;
+
+  // Fortune tabs
+  document.querySelectorAll('.fortune-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.fortune-tab').classList.add('active');
+  document.getElementById('fortune-content').textContent = currentFortune.overall;
+
+  showScreen('result');
+
+  // Reset for next time
+  const btn = document.getElementById('btn-shake');
+  btn.disabled = false;
+  btn.textContent = '✦ 開始求籤 ✦';
+  isAnimating = false;
+
+  // Reset loading steps
+  document.querySelectorAll('#loading-steps li').forEach(l => l.classList.remove('done'));
+}
+
+// ── Fortune tabs ───────────────────────────────────────────
+function showFortune(key, el) {
+  document.querySelectorAll('.fortune-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const content = document.getElementById('fortune-content');
+  content.style.opacity = '0';
+  setTimeout(() => {
+    content.textContent = currentFortune[key] || '';
+    content.style.opacity = '1';
+    content.style.transition = 'opacity 0.2s';
+  }, 100);
+}
+
+// ── Reset ──────────────────────────────────────────────────
+function onReset() {
+  currentLot = null;
+  showScreen('home');
+}
+
+// ── Share ──────────────────────────────────────────────────
+function onShare() {
+  if (!currentLot) return;
+  const C = TEMPLE_CONFIG;
+  const text =
+    `【${C.name} 第${String(currentLot.id).padStart(2,'0')}籤 ${currentLot.level}】\n\n` +
+    `${currentLot.poem}\n\n` +
+    `${currentLot.meaning}\n\n` +
+    `神示：${currentLot.advice}\n\n` +
+    `✦ 求籤僅供參考，凡事盡人事聽天命 ✦`;
+
+  if (navigator.share) {
+    navigator.share({ title: C.name + ' 籤詩', text: text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => showToast('籤詩已複製到剪貼簿'));
+  }
+}
+
+// ── Toast ──────────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2800);
+}
+
+// ── LLM hook (預留，之後接 Claude API) ───────────────────
+// async function getLLMInterpretation(lot, userQuestion) {
+//   const resp = await fetch('/api/interpret', {
+//     method: 'POST',
+//     body: JSON.stringify({ lot, question: userQuestion })
+//   });
+//   return resp.json();
+// }
+</script>
+</body>
+</html>
